@@ -1,8 +1,9 @@
 
 import { Router } from "express";
-import { Restaurant, Table, Reservation } from "../models";
+import { Restaurant, Table, Reservation, Waitlist } from "../models";
 import dayjs from "dayjs";
 import { Op } from "sequelize";
+import { cacheGet, cacheSet } from "../cache";
 
 const router = Router();
 
@@ -80,6 +81,9 @@ router.get("/:id/availability", async (req, res) => {
     }
     const ps = Number(partySize);
     const dur = Number(durationMinutes);
+    const cacheKey = `availability:${req.params.id}:${date}:${ps}:${dur}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
     const day = dayjs(date);
     const open = day.hour(Number(String(restaurant.get("openTime")).split(":")[0])).minute(Number(String(restaurant.get("openTime")).split(":")[1]));
     const close = day.hour(Number(String(restaurant.get("closeTime")).split(":")[0])).minute(Number(String(restaurant.get("closeTime")).split(":")[1]));
@@ -107,9 +111,41 @@ router.get("/:id/availability", async (req, res) => {
       if (available) slots.push(slotStart.format("HH:mm"));
       cursor = cursor.add(stepMinutes, "minute");
     }
-    res.json({ slots });
+    const result = { slots };
+    await cacheSet(cacheKey, JSON.stringify(result), 300);
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: "Failed to compute availability" });
+  }
+});
+
+router.post("/:id/waitlist", async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findByPk(req.params.id);
+    if (!restaurant) return res.status(404).json({ error: "Restaurant not found" });
+    const { customerName, phone, partySize, desiredTime } = req.body as { customerName?: string; phone?: string; partySize?: number; desiredTime?: string };
+    if (!customerName || !phone || !partySize || !desiredTime) return res.status(400).json({ error: "customerName, phone, partySize, desiredTime are required" });
+    const wl = await Waitlist.create({
+      customerName,
+      phone,
+      partySize,
+      desiredTime: dayjs(desiredTime).toDate(),
+      RestaurantId: restaurant.get("id") as number
+    });
+    res.status(201).json(wl);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to add to waitlist" });
+  }
+});
+
+router.get("/:id/waitlist", async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findByPk(req.params.id);
+    if (!restaurant) return res.status(404).json({ error: "Restaurant not found" });
+    const items = await Waitlist.findAll({ where: { RestaurantId: req.params.id }, order: [["desiredTime","ASC"]] });
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch waitlist" });
   }
 });
 

@@ -15,6 +15,7 @@ export const sequelize = new Sequelize(
 import { Restaurant } from "./restaurant";
 import { Table } from "./table";
 import { Reservation } from "./reservation";
+import { Waitlist } from "./waitlist";
 
 Restaurant.hasMany(Table, { foreignKey: "RestaurantId", onDelete: "CASCADE" });
 Table.belongsTo(Restaurant, { foreignKey: "RestaurantId" });
@@ -22,4 +23,7 @@ Table.belongsTo(Restaurant, { foreignKey: "RestaurantId" });
 Table.hasMany(Reservation, { foreignKey: "TableId", onDelete: "CASCADE" });
 Reservation.belongsTo(Table, { foreignKey: "TableId" });
 
-export { Restaurant, Table, Reservation };
+Restaurant.hasMany(Waitlist, { foreignKey: "RestaurantId", onDelete: "CASCADE" });
+Waitlist.belongsTo(Restaurant, { foreignKey: "RestaurantId" });
+
+export { Restaurant, Table, Reservation, Waitlist };

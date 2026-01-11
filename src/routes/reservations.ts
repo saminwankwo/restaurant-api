@@ -23,6 +23,17 @@ router.post("/:restaurantId", async (req, res) => {
     if (start.isBefore(open) || end.isAfter(close)) {
       return res.status(400).json({ error: "Reservation outside operating hours" });
     }
+    const peakStart = process.env.PEAK_START;
+    const peakEnd = process.env.PEAK_END;
+    const peakMax = process.env.PEAK_MAX_DURATION ? Number(process.env.PEAK_MAX_DURATION) : undefined;
+    if (peakStart && peakEnd && peakMax) {
+      const ps = start.startOf("day").hour(Number(peakStart.split(":")[0])).minute(Number(peakStart.split(":")[1]));
+      const pe = start.startOf("day").hour(Number(peakEnd.split(":")[0])).minute(Number(peakEnd.split(":")[1]));
+      const overlapsPeak = !(end.isBefore(ps) || start.isAfter(pe));
+      if (overlapsPeak && Number(durationMinutes) > peakMax) {
+        return res.status(400).json({ error: "Reservation exceeds peak-hour limit" });
+      }
+    }
 
     const tables = await Table.findAll({
       where: { RestaurantId: req.params.restaurantId, capacity: { [Op.gte]: Number(partySize) } },
