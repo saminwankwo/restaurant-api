@@ -8,6 +8,7 @@ export const Reservation = sequelize.define("Reservation", {
   partySize: DataTypes.INTEGER,
   startTime: DataTypes.DATE,
   endTime: DataTypes.DATE,
+  TableId: DataTypes.INTEGER,
   status: {
     type: DataTypes.ENUM("pending","confirmed","completed","cancelled"),
     defaultValue: "confirmed"
